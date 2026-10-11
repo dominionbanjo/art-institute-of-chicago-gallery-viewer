@@ -2,7 +2,8 @@ import { ApiResponse, Artwork } from "../types";
 import { 
   fetchArtworksFromAIC, 
   fetchArtworkByIdFromAIC, 
-  getImageUrl as getImageUrlService 
+  getImageUrl as getImageUrlService,
+  getDirectImageUrl as getDirectImageUrlService,
 } from "./api-service";
 
 /**
@@ -25,6 +26,7 @@ export async function getArtworkById(
 }
 
 /**
- * Re-export the image URL helper
+ * Re-export the image URL helpers
  */
 export const getImageUrl = getImageUrlService;
+export const getDirectImageUrl = getDirectImageUrlService;

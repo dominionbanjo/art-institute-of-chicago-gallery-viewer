@@ -23,79 +23,118 @@ export default function Pagination({ currentPage, totalPages }: PaginationProps)
   const hasPrev = currentPage > 1;
   const hasNext = currentPage < totalPages;
 
-  // Generate page numbers to show
-  const getPageNumbers = () => {
-    const pages = [];
-    const maxVisible = 5;
-    
-    if (totalPages <= maxVisible) {
+  // Centered window of `size` page numbers around the current page,
+  // pulled back to the start/end so the window never sits flush against
+  // the first or last page without showing the opposite edge.
+  const getPageWindow = (size: number): number[] => {
+    const pages: number[] = [];
+    if (totalPages <= size) {
       for (let i = 1; i <= totalPages; i++) pages.push(i);
-    } else {
-      let start = Math.max(1, currentPage - 2);
-      let end = Math.min(totalPages, start + maxVisible - 1);
-      
-      if (end === totalPages) {
-        start = Math.max(1, end - maxVisible + 1);
-      }
-      
-      for (let i = start; i <= end; i++) pages.push(i);
+      return pages;
     }
+
+    let start = Math.max(1, currentPage - Math.floor((size - 1) / 2));
+    const end = Math.min(totalPages, start + size - 1);
+
+    if (end === totalPages) {
+      start = Math.max(1, end - size + 1);
+    }
+
+    for (let i = start; i <= end; i++) pages.push(i);
     return pages;
   };
+
+  // First page + ellipsis around the window, then window, then
+  // ellipsis + last page — the curated set users can jump between.
+  const renderPageNumbers = (pages: number[]) => (
+    <>
+      {pages[0] > 1 && (
+        <>
+          <button
+            onClick={() => handlePageChange(1)}
+            className="pagination-item pagination-item-compact"
+            aria-label="First Page"
+          >
+            1
+          </button>
+          {pages[0] > 2 && (
+            <span className="text-muted-foreground px-0.5 sm:px-1" aria-hidden="true">
+              …
+            </span>
+          )}
+        </>
+      )}
+
+      {pages.map(page => (
+        <button
+          key={page}
+          onClick={() => handlePageChange(page)}
+          className={`pagination-item pagination-item-compact ${
+            currentPage === page ? 'pagination-item-active' : ''
+          }`}
+          aria-label={`Page ${page}`}
+          aria-current={currentPage === page ? 'page' : undefined}
+        >
+          {page}
+        </button>
+      ))}
+
+      {pages[pages.length - 1] < totalPages && (
+        <>
+          {pages[pages.length - 1] < totalPages - 1 && (
+            <span className="text-muted-foreground px-0.5 sm:px-1" aria-hidden="true">
+              …
+            </span>
+          )}
+          <button
+            onClick={() => handlePageChange(totalPages)}
+            className="pagination-item pagination-item-compact"
+            aria-label="Last Page"
+          >
+            {totalPages}
+          </button>
+        </>
+      )}
+    </>
+  );
 
   if (totalPages <= 1) return null;
 
   return (
-    <div className="flex items-center justify-center gap-2 mt-12 mb-8">
-      <button
-        onClick={() => handlePageChange(currentPage - 1)}
-        disabled={!hasPrev}
-        className="pagination-item disabled:opacity-30 mr-2"
-        aria-label="Previous Page"
-      >
-        <ArrowLeft2 size="16" color="currentColor" variant="Outline" />
-      </button>
+    <div className="flex flex-col items-center gap-3 mt-12 mb-8 sm:flex-row sm:justify-center sm:gap-2">
+      <div className="flex items-center justify-center gap-1 sm:gap-2">
+        <button
+          onClick={() => handlePageChange(currentPage - 1)}
+          disabled={!hasPrev}
+          className="pagination-item pagination-item-compact disabled:opacity-30 sm:mr-2"
+          aria-label="Previous Page"
+        >
+          <ArrowLeft2 size="16" color="currentColor" variant="Outline" />
+        </button>
 
-      <div className="hidden sm:flex items-center gap-2">
-        {getPageNumbers()[0] > 1 && (
-          <>
-            <button onClick={() => handlePageChange(1)} className="pagination-item">1</button>
-            {getPageNumbers()[0] > 2 && <span className="text-muted-foreground px-1">...</span>}
-          </>
-        )}
-        
-        {getPageNumbers().map(page => (
-          <button
-            key={page}
-            onClick={() => handlePageChange(page)}
-            className={`pagination-item ${currentPage === page ? 'pagination-item-active' : ''}`}
-          >
-            {page}
-          </button>
-        ))}
+        {/* Mobile: compact curated window so users can jump multiple pages */}
+        <div className="flex flex-wrap items-center justify-center gap-1 sm:hidden">
+          {renderPageNumbers(getPageWindow(3))}
+        </div>
 
-        {getPageNumbers()[getPageNumbers().length - 1] < totalPages && (
-          <>
-            {getPageNumbers()[getPageNumbers().length - 1] < totalPages - 1 && (
-              <span className="text-muted-foreground px-1">...</span>
-            )}
-            <button onClick={() => handlePageChange(totalPages)} className="pagination-item">{totalPages}</button>
-          </>
-        )}
+        {/* Desktop: wider window */}
+        <div className="hidden sm:flex items-center gap-2">
+          {renderPageNumbers(getPageWindow(5))}
+        </div>
+
+        <button
+          onClick={() => handlePageChange(currentPage + 1)}
+          disabled={!hasNext}
+          className="pagination-item pagination-item-compact disabled:opacity-30 sm:ml-2"
+          aria-label="Next Page"
+        >
+          <ArrowRight2 size="16" color="currentColor" variant="Outline" />
+        </button>
       </div>
 
-      <div className="sm:hidden text-sm font-medium px-4">
+      <div className="sm:hidden text-xs text-muted-foreground font-medium">
         Page {currentPage} of {totalPages}
       </div>
-
-      <button
-        onClick={() => handlePageChange(currentPage + 1)}
-        disabled={!hasNext}
-        className="pagination-item disabled:opacity-30 ml-2"
-        aria-label="Next Page"
-      >
-        <ArrowRight2 size="16" color="currentColor" variant="Outline" />
-      </button>
     </div>
   );
 }

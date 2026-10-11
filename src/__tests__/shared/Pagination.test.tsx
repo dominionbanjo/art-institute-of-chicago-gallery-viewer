@@ -22,7 +22,28 @@ describe('Pagination component', () => {
   it('renders correctly', () => {
     render(<Pagination currentPage={1} totalPages={10} />);
     expect(screen.getByText(/Page/i)).toBeInTheDocument();
-    expect(screen.getByText('1')).toBeInTheDocument();
+    // Numbers render in both the mobile and desktop windows.
+    expect(screen.getAllByText('1').length).toBeGreaterThan(0);
+  });
+
+  it('shows clickable page numbers spread out on mobile', () => {
+    render(<Pagination currentPage={6} totalPages={20} />);
+    // Curated window: first page, ellipsis, current-1..current+1, last page
+    expect(screen.getAllByText('1').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('5').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('6').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('7').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('20').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('…').length).toBeGreaterThan(0);
+  });
+
+  it('jumps directly to a clicked page number', () => {
+    render(<Pagination currentPage={6} totalPages={20} />);
+    const pageButtons = screen.getAllByRole('button', { name: 'Page 5' });
+
+    fireEvent.click(pageButtons[0]);
+
+    expect(mockPush).toHaveBeenCalledWith('/artworks?q=vangogh&page=5', { scroll: true });
   });
 
   it('disables "Prev" button on first page', () => {

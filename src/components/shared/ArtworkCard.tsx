@@ -1,7 +1,7 @@
-import Image from 'next/image';
 import Link from 'next/link';
 import { Artwork } from '@/types';
 import { getImageUrl } from '@/lib/api';
+import ArtworkImage from '@/components/shared/ArtworkImage';
 
 interface ArtworkCardProps {
   artwork: Artwork;
@@ -15,8 +15,9 @@ export default function ArtworkCard({ artwork }: ArtworkCardProps) {
     >
       <div className="relative aspect-[3/4] bg-surface overflow-hidden">
         {artwork.image_id ? (
-          <Image
+          <ArtworkImage
             src={getImageUrl(artwork.image_id, 400)}
+            lqip={artwork.thumbnail?.lqip}
             alt={artwork.title}
             fill
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"

@@ -97,6 +97,12 @@
     @apply min-w-[44px] h-10 px-3 flex items-center justify-center rounded-sm border border-border bg-background hover:bg-surface transition-all duration-200 text-sm font-medium;
   }
 
+  /* Smaller tap targets on mobile so the curated page-number window fits
+     on narrow screens; restores the full desktop size from sm up. */
+  .pagination-item-compact {
+    @apply min-w-9 h-9 px-2 sm:min-w-[44px] sm:h-10 sm:px-3;
+  }
+
   .pagination-item-active {
     @apply bg-primary text-primary-foreground border-primary pointer-events-none;
   }

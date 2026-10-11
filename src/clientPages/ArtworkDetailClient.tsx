@@ -1,9 +1,9 @@
 'use client';
 
-import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft2 } from 'iconsax-react';
 import { getImageUrl } from '@/lib/api';
+import ArtworkImage from '@/components/shared/ArtworkImage';
 import { Artwork } from '@/types';
 
 interface ArtworkDetailClientProps {
@@ -28,8 +28,9 @@ export default function ArtworkDetailClient({ artwork }: ArtworkDetailClientProp
       <div className="flex flex-col lg:flex-row gap-12 items-start">
         <div className="w-full lg:w-3/5 rounded-sm overflow-hidden bg-surface border border-border shadow-sm relative">
           <div className="relative pt-[100%] md:pt-[75%] lg:pt-[100%] xl:pt-[80%]">
-            <Image
+            <ArtworkImage
               src={getImageUrl(artwork.image_id, 843)}
+              lqip={artwork.thumbnail?.lqip}
               alt={artwork.thumbnail?.alt_text || artwork.title || 'Detailed Artwork Image'}
               fill
               sizes="(max-width: 1024px) 100vw, 60vw"

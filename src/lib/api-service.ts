@@ -1,11 +1,68 @@
 import { Artwork, ApiResponse } from "@/types";
 
 const API_BASE = "https://api.artic.edu/api/v1";
+const IIIF_BASE = "https://www.artic.edu/iiif/2";
+
+const FETCH_TIMEOUT_MS = 12000;
+const FETCH_RETRY_TIMEOUT_MS = 8000;
+
+type ExtendedFetchInit = RequestInit & {
+  next?: { revalidate?: number | false };
+  cf?: { cacheEverything?: boolean; cacheTtl?: number };
+};
 
 /**
  * Core service logic for fetching from the Art Institute of Chicago API.
  * This runs on the "Next.js server" (API routes or Server Components).
  */
+
+function isTimeoutError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    (error.name === "TimeoutError" || error.name === "AbortError")
+  );
+}
+
+/**
+ * fetch with a hard timeout and a single retry (on timeout, network error,
+ * or upstream 5xx), so a degraded AIC API fails fast with a friendly message
+ * instead of hanging the request.
+ */
+async function resilientFetch(
+  url: string,
+  init: ExtendedFetchInit = {},
+): Promise<Response> {
+  let firstResponse: Response | null = null;
+
+  try {
+    const res = await fetch(url, {
+      ...init,
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+    if (res.status < 500) return res;
+    firstResponse = res;
+  } catch (error) {
+    if (!isTimeoutError(error) && firstResponse === null) throw error;
+  }
+
+  try {
+    const res = await fetch(url, {
+      ...init,
+      signal: AbortSignal.timeout(FETCH_RETRY_TIMEOUT_MS),
+    });
+    if (res.status < 500) return res;
+    // Upstream still 5xx on the retry — surface the first response's status.
+    return firstResponse ?? res;
+  } catch (error) {
+    if (isTimeoutError(error)) {
+      throw new Error(
+        "The Art Institute API is taking too long to respond. Please try again shortly.",
+      );
+    }
+    if (firstResponse) return firstResponse;
+    throw error;
+  }
+}
 
 export async function fetchArtworksFromAIC(
   page: number = 1,
@@ -20,7 +77,7 @@ export async function fetchArtworksFromAIC(
     url = `${API_BASE}/artworks?page=${page}&limit=${limit}&fields=id,title,artist_display,artist_title,date_display,medium_display,image_id,thumbnail,is_public_domain,artwork_type_title`;
   }
 
-  const res = await fetch(url, {
+  const res = await resilientFetch(url, {
     next: { revalidate: 3600 },
     cf: {
       cacheEverything: true,
@@ -42,13 +99,19 @@ export async function fetchArtworksFromAIC(
   return data;
 }
 
+const DETAIL_FIELDS =
+  "id,title,artist_display,artist_title,date_display,medium_display,description,short_description,dimensions,credit_line,place_of_origin,image_id,thumbnail,is_public_domain,artwork_type_title";
+
 export async function fetchArtworkByIdFromAIC(
   id: string,
 ): Promise<ApiResponse<Artwork>> {
-  const url = `${API_BASE}/artworks/${id}`;
+  // The dedicated /artworks/{id} detail endpoint currently hangs from many
+  // networks, while the list endpoint filtered by ?ids= returns the exact
+  // same fields reliably (and often much faster). Prefer the list path.
+  const url = `${API_BASE}/artworks?ids=${encodeURIComponent(id)}&fields=${DETAIL_FIELDS}`;
 
-  const res = await fetch(url, {
-    cache: "force-cache",
+  const res = await resilientFetch(url, {
+    next: { revalidate: 3600 },
   });
 
   if (!res.ok) {
@@ -58,16 +121,36 @@ export async function fetchArtworkByIdFromAIC(
     throw new Error("Failed to fetch artwork details.");
   }
 
-  return res.json();
+  const payload: ApiResponse<Artwork[]> = await res.json();
+  const artwork = payload.data?.[0];
+
+  // ?ids= returns an empty data array (not 404) when the id doesn't exist.
+  if (!artwork) {
+    throw new Error("Artwork not found");
+  }
+
+  return { ...payload, data: artwork };
 }
 
 /**
- * Helper to construct the IIIF image URL
+ * Helper to construct the IIIF image URL (direct, bypasses our proxy).
+ */
+export function getDirectImageUrl(
+  imageId: string,
+  size: number = 843,
+): string {
+  return `${IIIF_BASE}/${imageId}/full/${size},/0/default.jpg`;
+}
+
+/**
+ * Helper to construct the image URL used by the UI.
+ * Routes through our own proxy (/api/image) so images keep loading even
+ * when artic.edu's Cloudflare challenges direct hotlinks.
  */
 export function getImageUrl(
   imageId: string | undefined,
   size: number = 843,
 ): string {
   if (!imageId) return "/placeholder.png";
-  return `https://www.artic.edu/iiif/2/${imageId}/full/${size},/0/default.jpg`;
+  return `/api/image?id=${encodeURIComponent(imageId)}&w=${size}`;
 }
