@@ -6,6 +6,21 @@ const IIIF_BASE = "https://www.artic.edu/iiif/2";
 const FETCH_TIMEOUT_MS = 12000;
 const FETCH_RETRY_TIMEOUT_MS = 8000;
 
+/**
+ * artic.edu sits behind Cloudflare and challenges (403) requests from
+ * flagged egress ranges — e.g. Vercel's — that don't identify themselves.
+ * AIC documents the AIC-User-Agent header for exactly this purpose (the
+ * image proxy in src/app/api/image/route.ts already relies on it).
+ * Send it plus browser-like headers on every API call so production
+ * (Vercel) gets 200s just like local dev does.
+ */
+const AIC_HEADERS = {
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+  Accept: "application/json",
+  "AIC-User-Agent": "aic-gallery (engineering@artic.edu)",
+};
+
 type ExtendedFetchInit = RequestInit & {
   next?: { revalidate?: number | false };
   cf?: { cacheEverything?: boolean; cacheTtl?: number };
@@ -37,6 +52,7 @@ async function resilientFetch(
   try {
     const res = await fetch(url, {
       ...init,
+      headers: { ...AIC_HEADERS, ...(init.headers ?? {}) },
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
     if (res.status < 500) return res;
@@ -48,6 +64,7 @@ async function resilientFetch(
   try {
     const res = await fetch(url, {
       ...init,
+      headers: { ...AIC_HEADERS, ...(init.headers ?? {}) },
       signal: AbortSignal.timeout(FETCH_RETRY_TIMEOUT_MS),
     });
     if (res.status < 500) return res;
